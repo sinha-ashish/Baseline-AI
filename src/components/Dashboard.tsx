@@ -24,16 +24,18 @@ import {
 import { cn, formatEur, formatEurPrecise, formatNumber } from "@/lib/utils";
 
 const FUNNEL_STATUSES = ["Idea", "POC", "Pilot", "Production"] as const;
+// Lifecycle as a neutral intensity ramp — colour stays reserved for measured
+// (emerald) and caution (amber).
 const FUNNEL_COLORS: Record<(typeof FUNNEL_STATUSES)[number], string> = {
-  Idea: "#52525b",
-  POC: "#38bdf8",
-  Pilot: "#a78bfa",
-  Production: "#10b981",
+  Idea: "#3f3f46",
+  POC: "#52525b",
+  Pilot: "#71717a",
+  Production: "#d4d4d8",
 };
 
 const CONFIDENCE_COLORS = {
   High: "#10b981",
-  Medium: "#f59e0b",
+  Medium: "#71717a",
   Low: "#3f3f46",
 } as const;
 
@@ -89,13 +91,19 @@ export function Dashboard() {
             <CardDescription>Cost per Hour Saved</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-5xl font-bold tracking-tight text-emerald-400">
-              {totals.costPerHourSaved === null ? "—" : formatEurPrecise(totals.costPerHourSaved)}
+            <div className="text-5xl font-bold tracking-tight">
+              {totals.costPerHourSaved === null
+                ? "—"
+                : `≈ ${formatEurPrecise(totals.costPerHourSaved)}`}
             </div>
-            <p className="mt-2 text-xs text-muted-foreground">
-              {totals.measuredShare === null
-                ? "No active spend yet"
-                : `${totals.measuredShare.toFixed(0)}% of spend is High-confidence (“measured share”)`}
+            <p className="mt-2 text-xs">
+              {totals.measuredShare === null ? (
+                <span className="text-muted-foreground">No active spend yet</span>
+              ) : (
+                <span className="text-emerald-400">
+                  Measured share: {totals.measuredShare.toFixed(0)}% of monthly spend
+                </span>
+              )}
             </p>
           </CardContent>
         </Card>
@@ -262,7 +270,7 @@ export function Dashboard() {
                   <span
                     className={cn(
                       "tabular-nums text-muted-foreground",
-                      overBudget && "font-semibold text-red-400"
+                      overBudget && "font-semibold text-amber-400"
                     )}
                   >
                     {formatEur(spend)} / {formatEur(department.monthlyBudget)}
@@ -273,7 +281,7 @@ export function Dashboard() {
                   <div
                     className={cn(
                       "h-full rounded-full transition-all",
-                      overBudget ? "bg-red-500" : "bg-emerald-500"
+                      overBudget ? "bg-amber-500" : "bg-emerald-500"
                     )}
                     style={{
                       width: `${Math.min(100, (utilization ?? 0) * 100)}%`,
@@ -307,6 +315,7 @@ export function Dashboard() {
                     </div>
                     <div className="shrink-0 text-right">
                       <div className="text-sm font-semibold tabular-nums">
+                        {uc.confidence !== "High" && "≈ "}
                         {formatEur(uc.expectedMonthlyCost)}
                         <span className="text-muted-foreground">/mo</span>
                       </div>

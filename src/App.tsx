@@ -1,6 +1,5 @@
-import { useState } from "react";
-import { LayoutDashboard, RotateCcw, Table2 } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useEffect, useState } from "react";
+import { RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -10,42 +9,63 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Header } from "@/components/Header";
 import { Landing } from "@/components/Landing";
 import { Dashboard } from "@/components/Dashboard";
 import { Ledger } from "@/components/Ledger";
+import { EstimatePlaceholder } from "@/components/EstimatePlaceholder";
 import { useLedgerStore } from "@/store";
 
+function currentRoute(): string {
+  return window.location.hash.replace(/^#\/?/, "").split("?")[0];
+}
+
+function useHashRoute(): string {
+  const [route, setRoute] = useState(currentRoute);
+  useEffect(() => {
+    const onHashChange = () => {
+      setRoute(currentRoute());
+      window.scrollTo(0, 0);
+    };
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
+  return route;
+}
+
 export default function App() {
+  const route = useHashRoute();
   const resetDemoData = useLedgerStore((s) => s.resetDemoData);
   const [confirmReset, setConfirmReset] = useState(false);
 
   return (
     <div className="flex min-h-screen flex-col">
-      <Landing />
+      <Header route={route} />
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-10">
-        <Tabs defaultValue="dashboard">
-          <TabsList>
-            <TabsTrigger value="dashboard">
-              <LayoutDashboard className="h-4 w-4" /> Dashboard
-            </TabsTrigger>
-            <TabsTrigger value="ledger">
-              <Table2 className="h-4 w-4" /> Ledger
-            </TabsTrigger>
-          </TabsList>
-          <TabsContent value="dashboard" className="mt-6">
-            <Dashboard />
-          </TabsContent>
-          <TabsContent value="ledger" className="mt-6">
+      <main className="flex-1">
+        {route === "" && <Landing />}
+        {route === "estimate" && (
+          <div className="mx-auto w-full max-w-6xl px-6 py-10">
+            <EstimatePlaceholder />
+          </div>
+        )}
+        {route === "ledger" && (
+          <div className="mx-auto w-full max-w-6xl px-6 py-10">
             <Ledger />
-          </TabsContent>
-        </Tabs>
+          </div>
+        )}
+        {route === "dashboard" && (
+          <div className="mx-auto w-full max-w-6xl px-6 py-10">
+            <Dashboard />
+          </div>
+        )}
+        {!["", "estimate", "ledger", "dashboard"].includes(route) && <Landing />}
       </main>
 
       <footer className="border-t border-border/60">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-6 py-5">
           <p className="text-xs text-muted-foreground">
-            Prototype — data stays in your browser.
+            Prototype — your data lives in this browser. No account, nothing leaves your machine.
           </p>
           <Button
             variant="ghost"
@@ -63,7 +83,7 @@ export default function App() {
           <DialogHeader>
             <DialogTitle>Reset demo data?</DialogTitle>
             <DialogDescription>
-              All your changes will be discarded and the original 10 demo use cases restored.
+              All your changes will be discarded and the original demo use cases restored.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

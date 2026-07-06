@@ -36,8 +36,13 @@ export interface PortfolioTotals {
   activeCount: number;
 }
 
-export function portfolioTotals(useCases: UseCase[]): PortfolioTotals {
-  const active = useCases.filter(isActive);
+export function portfolioTotals(
+  useCases: UseCase[],
+  opts?: { measuredOnly?: boolean }
+): PortfolioTotals {
+  const active = useCases
+    .filter(isActive)
+    .filter((uc) => !opts?.measuredOnly || uc.confidence === "High");
   const monthlyCost = active.reduce((s, uc) => s + uc.expectedMonthlyCost, 0);
   const hoursSaved = active.reduce((s, uc) => s + hoursSavedPerMonth(uc), 0);
   const impactedUsers = active.reduce((s, uc) => s + uc.totalUsers, 0);

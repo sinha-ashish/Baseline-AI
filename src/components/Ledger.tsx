@@ -204,14 +204,25 @@ export function Ledger() {
                     <TableCell className="text-right tabular-nums">
                       {formatNumber(hoursSavedPerMonth(uc))}
                     </TableCell>
-                    <TableCell className="text-right font-medium tabular-nums">
+                    <TableCell
+                      className={cn(
+                        "text-right font-medium tabular-nums",
+                        uc.confidence === "Low" && "text-zinc-400"
+                      )}
+                    >
+                      {uc.confidence !== "High" && "≈ "}
                       {formatEur(uc.expectedMonthlyCost)}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">
+                    <TableCell
+                      className={cn(
+                        "text-right tabular-nums",
+                        uc.confidence === "Low" && "text-zinc-400"
+                      )}
+                    >
                       {cph === null ? (
                         <span className="text-muted-foreground">—</span>
                       ) : (
-                        formatEurPrecise(cph)
+                        `${uc.confidence !== "High" ? "≈ " : ""}${formatEurPrecise(cph)}`
                       )}
                     </TableCell>
                     <TableCell className="pr-4">
