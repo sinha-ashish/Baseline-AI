@@ -13,7 +13,7 @@ import { Header } from "@/components/Header";
 import { Landing } from "@/components/Landing";
 import { Dashboard } from "@/components/Dashboard";
 import { Ledger } from "@/components/Ledger";
-import { EstimatePlaceholder } from "@/components/EstimatePlaceholder";
+import { Estimator } from "@/components/Estimator";
 import { useLedgerStore } from "@/store";
 
 function currentRoute(): string {
@@ -46,7 +46,7 @@ export default function App() {
         {route === "" && <Landing />}
         {route === "estimate" && (
           <div className="mx-auto w-full max-w-6xl px-6 py-10">
-            <EstimatePlaceholder />
+            <Estimator />
           </div>
         )}
         {route === "ledger" && (

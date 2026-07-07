@@ -10,6 +10,24 @@ export type UsagePattern = (typeof USAGE_PATTERNS)[number];
 export const CONFIDENCES = ["Low", "Medium", "High"] as const;
 export type Confidence = (typeof CONFIDENCES)[number];
 
+/**
+ * The inputs and band of a simulated estimate, stored on the ledger entry it
+ * created so the number stays inspectable after the fact.
+ */
+export interface StoredEstimate {
+  volume: import("./estimator").Volume;
+  tokensInPerCall: number;
+  tokensOutPerCall: number;
+  modelId: string;
+  modelLabel: string;
+  busyMultiplier: number;
+  badDayMultiplier: number;
+  /** EUR per month. */
+  band: { expected: number; busyMonth: number; badDay: number };
+  pricesAsOf: string;
+  createdAt: string; // ISO date
+}
+
 export interface UseCase {
   id: string;
   name: string;
@@ -24,6 +42,7 @@ export interface UseCase {
   peakUsage: string;
   fallback: string;
   confidence: Confidence;
+  estimate?: StoredEstimate;
 }
 
 export interface Department {

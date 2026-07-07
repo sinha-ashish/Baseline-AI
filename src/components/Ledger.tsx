@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown, Download, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -41,6 +41,15 @@ export function Ledger() {
   const useCases = useLedgerStore((s) => s.useCases);
   const departments = useLedgerStore((s) => s.departments);
   const deleteUseCase = useLedgerStore((s) => s.deleteUseCase);
+  const highlightId = useLedgerStore((s) => s.highlightId);
+  const setHighlight = useLedgerStore((s) => s.setHighlight);
+
+  // Fade the just-added-from-estimator highlight after a beat.
+  useEffect(() => {
+    if (!highlightId) return;
+    const timer = setTimeout(() => setHighlight(null), 3500);
+    return () => clearTimeout(timer);
+  }, [highlightId, setHighlight]);
 
   const [departmentFilter, setDepartmentFilter] = useState(ALL);
   const [statusFilter, setStatusFilter] = useState(ALL);
@@ -184,7 +193,18 @@ export function Ledger() {
                 const cph = costPerHourSaved(uc);
                 const stopped = uc.status === "Stopped";
                 return (
-                  <TableRow key={uc.id} className={cn(stopped && "opacity-55")}>
+                  <TableRow
+                    key={uc.id}
+                    ref={
+                      uc.id === highlightId
+                        ? (el) => el?.scrollIntoView({ block: "center" })
+                        : undefined
+                    }
+                    className={cn(
+                      stopped && "opacity-55",
+                      uc.id === highlightId && "bg-emerald-500/10 transition-colors duration-1000"
+                    )}
+                  >
                     <TableCell className="pl-4">
                       <div className="font-medium">{uc.name}</div>
                       <div className="mt-0.5 text-xs text-muted-foreground">

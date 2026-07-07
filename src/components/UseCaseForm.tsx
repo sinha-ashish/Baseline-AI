@@ -168,6 +168,33 @@ export function UseCaseFormSheet({
           </SheetDescription>
         </SheetHeader>
 
+        {editing?.estimate && (
+          <div className="space-y-1 rounded-md border border-dashed border-zinc-700 bg-secondary/40 p-3 text-xs leading-relaxed text-muted-foreground">
+            <div className="font-medium text-foreground">
+              Original estimate — {editing.estimate.modelLabel},{" "}
+              {new Date(editing.estimate.createdAt).toLocaleDateString("en-IE", {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+              })}
+            </div>
+            <p>
+              Expected ≈€{Math.round(editing.estimate.band.expected).toLocaleString("en-IE")} ·
+              busy month ≈€{Math.round(editing.estimate.band.busyMonth).toLocaleString("en-IE")} ·
+              bad day ≈€{Math.round(editing.estimate.band.badDay).toLocaleString("en-IE")} per
+              month.
+            </p>
+            <p>
+              {editing.estimate.volume.kind === "user-driven"
+                ? `${editing.estimate.volume.users} users × ${editing.estimate.volume.interactionsPerUserPerMonth} interactions/month`
+                : `${editing.estimate.volume.runsPerMonth} runs × ${editing.estimate.volume.itemsPerRun} items × ${editing.estimate.volume.callsPerItem} calls`}
+              , {editing.estimate.tokensInPerCall.toLocaleString("en-IE")} in /{" "}
+              {editing.estimate.tokensOutPerCall.toLocaleString("en-IE")} out tokens per call.
+              Prices as of {editing.estimate.pricesAsOf}.
+            </p>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="flex flex-1 flex-col gap-4">
           <Field label="Name" error={errors.name}>
             <Input

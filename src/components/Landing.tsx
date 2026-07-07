@@ -55,16 +55,16 @@ export function Landing() {
         </p>
         <div className="mt-9 flex flex-wrap gap-3">
           <a
-            href="#/dashboard"
+            href="#/estimate"
             className="inline-flex h-10 items-center rounded-md bg-primary px-5 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90"
           >
-            Open the dashboard
+            Estimate a use case
           </a>
           <a
-            href="#/ledger"
+            href="#/dashboard"
             className="inline-flex h-10 items-center rounded-md border border-input px-5 text-sm font-medium transition-colors hover:bg-accent"
           >
-            Browse the ledger
+            Open the dashboard
           </a>
         </div>
       </section>
@@ -182,7 +182,7 @@ export function Landing() {
         <div className="mt-8 max-w-2xl space-y-4 text-sm sm:text-base">
           <StatementRow
             label="Simulate — price a use case before it exists"
-            value={<span className="text-muted-foreground">next</span>}
+            value={<span className="text-emerald-400">live</span>}
           />
           <StatementRow
             label="Track & reconcile — the ledger and measured actuals"
