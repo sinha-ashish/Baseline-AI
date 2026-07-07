@@ -23,8 +23,16 @@ import {
   CONFIDENCES,
   STATUSES,
   USAGE_PATTERNS,
-  type UseCase,
+  type Initiative,
 } from "@/lib/types";
+import {
+  BUILD_EFFORTS,
+  EFFORT_HINTS,
+  PERCEIVED_VALUES,
+  VALUE_ANCHORS,
+  type BuildEffort,
+  type PerceivedValue,
+} from "@/lib/verdict";
 
 interface FormState {
   name: string;
@@ -39,6 +47,8 @@ interface FormState {
   peakUsage: string;
   fallback: string;
   confidence: string;
+  perceivedValue: string;
+  buildEffort: string;
 }
 
 type FormErrors = Partial<Record<keyof FormState, string>>;
@@ -57,23 +67,27 @@ function emptyForm(defaultDepartment: string): FormState {
     peakUsage: "",
     fallback: "",
     confidence: "Low",
+    perceivedValue: "3",
+    buildEffort: "M",
   };
 }
 
-function fromUseCase(uc: UseCase): FormState {
+function fromInitiative(initiative: Initiative): FormState {
   return {
-    name: uc.name,
-    department: uc.department,
-    owner: uc.owner,
-    status: uc.status,
-    category: uc.category,
-    usagePattern: uc.usagePattern,
-    totalUsers: String(uc.totalUsers),
-    timeSavedPerUserPerMonth: String(uc.timeSavedPerUserPerMonth),
-    expectedMonthlyCost: String(uc.expectedMonthlyCost),
-    peakUsage: uc.peakUsage,
-    fallback: uc.fallback,
-    confidence: uc.confidence,
+    name: initiative.name,
+    department: initiative.department,
+    owner: initiative.owner,
+    status: initiative.status,
+    category: initiative.category,
+    usagePattern: initiative.usagePattern,
+    totalUsers: String(initiative.totalUsers),
+    timeSavedPerUserPerMonth: String(initiative.timeSavedPerUserPerMonth),
+    expectedMonthlyCost: String(initiative.expectedMonthlyCost),
+    peakUsage: initiative.peakUsage,
+    fallback: initiative.fallback,
+    confidence: initiative.confidence,
+    perceivedValue: String(initiative.perceivedValue),
+    buildEffort: initiative.buildEffort,
   };
 }
 
@@ -100,18 +114,18 @@ function validate(form: FormState): FormErrors {
   return errors;
 }
 
-export function UseCaseFormSheet({
+export function InitiativeFormSheet({
   open,
   onOpenChange,
   editing,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  editing: UseCase | null;
+  editing: Initiative | null;
 }) {
   const departments = useLedgerStore((s) => s.departments);
-  const addUseCase = useLedgerStore((s) => s.addUseCase);
-  const updateUseCase = useLedgerStore((s) => s.updateUseCase);
+  const addInitiative = useLedgerStore((s) => s.addInitiative);
+  const updateInitiative = useLedgerStore((s) => s.updateInitiative);
 
   const defaultDepartment = departments[0]?.name ?? "";
   const [form, setForm] = useState<FormState>(() => emptyForm(defaultDepartment));
@@ -119,7 +133,7 @@ export function UseCaseFormSheet({
 
   useEffect(() => {
     if (open) {
-      setForm(editing ? fromUseCase(editing) : emptyForm(defaultDepartment));
+      setForm(editing ? fromInitiative(editing) : emptyForm(defaultDepartment));
       setErrors({});
     }
   }, [open, editing, defaultDepartment]);
@@ -133,25 +147,29 @@ export function UseCaseFormSheet({
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
 
-    const payload: Omit<UseCase, "id"> = {
+    // estimate and actuals are deliberately not form fields — updates merge,
+    // so they survive edits untouched.
+    const payload: Omit<Initiative, "id"> = {
       name: form.name.trim(),
       department: form.department,
       owner: form.owner.trim(),
-      status: form.status as UseCase["status"],
-      category: form.category as UseCase["category"],
-      usagePattern: form.usagePattern as UseCase["usagePattern"],
+      status: form.status as Initiative["status"],
+      category: form.category as Initiative["category"],
+      usagePattern: form.usagePattern as Initiative["usagePattern"],
       totalUsers: Number(form.totalUsers),
       timeSavedPerUserPerMonth: Number(form.timeSavedPerUserPerMonth),
       expectedMonthlyCost: Number(form.expectedMonthlyCost),
       peakUsage: form.peakUsage.trim(),
       fallback: form.fallback.trim(),
-      confidence: form.confidence as UseCase["confidence"],
+      confidence: form.confidence as Initiative["confidence"],
+      perceivedValue: Number(form.perceivedValue) as PerceivedValue,
+      buildEffort: form.buildEffort as BuildEffort,
     };
 
     if (editing) {
-      updateUseCase(editing.id, payload);
+      updateInitiative(editing.id, payload);
     } else {
-      addUseCase(payload);
+      addInitiative(payload);
     }
     onOpenChange(false);
   }
@@ -160,13 +178,40 @@ export function UseCaseFormSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent>
         <SheetHeader>
-          <SheetTitle>{editing ? "Edit use case" : "Add use case"}</SheetTitle>
+          <SheetTitle>{editing ? "Edit initiative" : "Add initiative"}</SheetTitle>
           <SheetDescription>
             {editing
-              ? "Update the details of this AI use case."
-              : "Record a new AI use case in the ledger."}
+              ? "Update the details of this AI initiative."
+              : "Record a new AI initiative in the ledger."}
           </SheetDescription>
         </SheetHeader>
+
+        {editing?.estimate && (
+          <div className="space-y-1 rounded-md border border-dashed border-zinc-700 bg-secondary/40 p-3 text-xs leading-relaxed text-muted-foreground">
+            <div className="font-medium text-foreground">
+              Original estimate — {editing.estimate.engineLabel},{" "}
+              {new Date(editing.estimate.createdAt).toLocaleDateString("en-IE", {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+              })}
+            </div>
+            <p>
+              Expected ≈€{Math.round(editing.estimate.band.expected).toLocaleString("en-IE")} ·
+              busy month ≈€{Math.round(editing.estimate.band.busyMonth).toLocaleString("en-IE")} ·
+              bad day ≈€{Math.round(editing.estimate.band.badDay).toLocaleString("en-IE")} per
+              month.
+            </p>
+            <p>
+              {editing.estimate.volume.kind === "user-driven"
+                ? `${editing.estimate.volume.users} users × ${editing.estimate.volume.interactionsPerUserPerMonth} interactions/month`
+                : `${editing.estimate.volume.runsPerMonth} runs × ${editing.estimate.volume.itemsPerRun} items × ${editing.estimate.volume.callsPerItem} calls`}
+              , {editing.estimate.tokensInPerCall.toLocaleString("en-IE")} in /{" "}
+              {editing.estimate.tokensOutPerCall.toLocaleString("en-IE")} out tokens per call.
+              Prices as of {editing.estimate.pricesAsOf}.
+            </p>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="flex flex-1 flex-col gap-4">
           <Field label="Name" error={errors.name}>
@@ -264,6 +309,37 @@ export function UseCaseFormSheet({
           </div>
 
           <div className="grid grid-cols-2 gap-4">
+            <Field label="Perceived value (your judgment)">
+              <Select value={form.perceivedValue} onValueChange={set("perceivedValue")}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PERCEIVED_VALUES.map((v) => (
+                    <SelectItem key={v} value={String(v)}>
+                      {v} — {VALUE_ANCHORS[v]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Build effort (rough)">
+              <Select value={form.buildEffort} onValueChange={set("buildEffort")}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {BUILD_EFFORTS.map((e) => (
+                    <SelectItem key={e} value={e}>
+                      {e} — {EFFORT_HINTS[e]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
             <Field label="Total users" error={errors.totalUsers}>
               <Input
                 type="number"
@@ -317,7 +393,7 @@ export function UseCaseFormSheet({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit">{editing ? "Save changes" : "Add use case"}</Button>
+            <Button type="submit">{editing ? "Save changes" : "Add initiative"}</Button>
           </SheetFooter>
         </form>
       </SheetContent>

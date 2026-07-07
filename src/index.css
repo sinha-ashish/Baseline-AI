@@ -37,6 +37,8 @@
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    /* Numbers are the heroes of every screen — tabular everywhere, no exceptions. */
+    font-variant-numeric: tabular-nums;
   }
 }
 

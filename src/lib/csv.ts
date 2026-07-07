@@ -1,10 +1,11 @@
-import type { UseCase } from "./types";
+import type { Initiative } from "./types";
 import {
   annualCost,
   costPerHourSaved,
   costPerUser,
   hoursSavedPerMonth,
 } from "./metrics";
+import { VERDICT_META, verdictFor } from "./verdict";
 
 function escapeCsv(value: string | number): string {
   const s = String(value);
@@ -14,7 +15,7 @@ function escapeCsv(value: string | number): string {
   return s;
 }
 
-export function useCasesToCsv(useCases: UseCase[]): string {
+export function initiativesToCsv(initiatives: Initiative[]): string {
   const header = [
     "Name",
     "Department",
@@ -25,35 +26,46 @@ export function useCasesToCsv(useCases: UseCase[]): string {
     "Total Users",
     "Time Saved per User per Month (h)",
     "Expected Monthly Cost (EUR)",
+    "Actual Monthly Cost (EUR)",
     "Annual Cost (EUR)",
-    "Hours Saved per Month",
+    "Claimed Hours Saved per Month",
+    "Actual Hours Saved per Month",
     "Cost per Hour Saved (EUR)",
     "Cost per User (EUR)",
+    "Perceived Value (1-5)",
+    "Build Effort",
+    "Verdict",
     "Peak Usage",
     "Fallback",
     "Confidence",
   ];
 
-  const rows = useCases.map((uc) => {
-    const cph = costPerHourSaved(uc);
-    const cpu = costPerUser(uc);
+  const rows = initiatives.map((i) => {
+    const cph = costPerHourSaved(i);
+    const cpu = costPerUser(i);
+    const verdict = verdictFor(i.perceivedValue, i.expectedMonthlyCost, i.buildEffort);
     return [
-      uc.name,
-      uc.department,
-      uc.owner,
-      uc.status,
-      uc.category,
-      uc.usagePattern,
-      uc.totalUsers,
-      uc.timeSavedPerUserPerMonth,
-      uc.expectedMonthlyCost,
-      annualCost(uc),
-      hoursSavedPerMonth(uc),
+      i.name,
+      i.department,
+      i.owner,
+      i.status,
+      i.category,
+      i.usagePattern,
+      i.totalUsers,
+      i.timeSavedPerUserPerMonth,
+      i.expectedMonthlyCost,
+      i.actuals ? i.actuals.monthlyCost : "",
+      annualCost(i),
+      hoursSavedPerMonth(i),
+      i.actuals ? i.actuals.hoursSavedPerMonth : "",
       cph === null ? "" : cph.toFixed(2),
       cpu === null ? "" : cpu.toFixed(2),
-      uc.peakUsage,
-      uc.fallback,
-      uc.confidence,
+      i.perceivedValue,
+      i.buildEffort,
+      VERDICT_META[verdict].label,
+      i.peakUsage,
+      i.fallback,
+      i.confidence,
     ].map(escapeCsv);
   });
 

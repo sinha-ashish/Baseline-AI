@@ -1,45 +1,62 @@
-# Baseline AI — the AI ROI Ledger
+# Baseline AI
 
 Know what your AI is worth. Not just what it costs.
 
-A single-page SaaS prototype for tracking enterprise AI use cases as a ledger: expected
-monthly cost against hours saved, with per-department budgets and an honest confidence
-label on every estimate. No backend, no auth — all data lives in your browser's
-localStorage.
+Baseline is a suite for enterprise AI economics covering the full lifecycle of an AI cost
+number — **Estimate → Track → Reconcile** — and the judgment call that comes before all of
+it: what's worth building. Every figure carries a confidence label (Low = assumption,
+Medium = pilot data, High = measured), and the product refuses to show a number without
+telling you how much to trust it.
+
+## The suite
+
+- **The Estimator** prices an AI initiative before it is built: size the usage with
+  transparent token presets, pick a model — or "let the gateway decide" with an adjustable
+  cheap/premium routing blend — and read the cost as a deterministic scenario band
+  (expected / busy month / bad day) with the arithmetic shown in full. Perceived value
+  (1–5) and build effort (S/M/L) produce a plain-language verdict on a 2×2: Quick win,
+  Strategic bet, Filler, or Trap. One click lands it in the Ledger stamped Low confidence.
+  A "view as workflow" second lens renders the same estimate as a cost flow; named
+  scenario projects can be kept side by side.
+- **The Ledger** tracks the live portfolio: cost, hours saved, owners, budgets, filters,
+  sorting, CSV export. "Record actuals" flips an entry from guessed to measured and shows
+  the delta against the original estimate.
+- **The Dashboard** aggregates it: cost per hour saved, measured share, adoption funnel,
+  confidence mix, department budgets, value-vs-cost quadrant with traps flagged,
+  estimate-vs-reality reconciliation — and the "Show only what's measured" toggle that
+  drains every unmeasured number out of the totals.
 
 ## Stack
 
 - React 18 + Vite + TypeScript
 - Tailwind CSS + shadcn/ui-style components (Radix primitives)
-- Zustand with localStorage persistence
+- Zustand with versioned localStorage persistence (schema v3, migrations included)
 - Recharts
+
+All cost math lives in pure, unit-tested functions in `src/lib/` (Vitest). Model pricing
+is a static, dated snapshot in `src/lib/pricing.ts` — `pricesAsOf` is rendered wherever
+prices appear.
 
 ## Develop
 
 ```sh
 npm install
 npm run dev
+npm test
 ```
 
-## Build
+## Build & deploy
 
 ```sh
 npm run build
 npm run preview
 ```
 
-## Deploy to Vercel
-
-The project is a static Vite build — Vercel detects it automatically:
-
-```sh
-vercel
-```
-
-(Framework preset: Vite, build command `npm run build`, output directory `dist`.)
+Static Vite build — Vercel auto-detects it (`vercel`, output `dist/`).
 
 ## Notes
 
-- Portfolio totals aggregate only non-Stopped use cases.
-- "Measured share" = % of monthly cost carried by High-confidence entries.
-- "Reset demo data" in the footer restores the 10 seeded use cases.
+- No backend, no auth: data lives in the browser's localStorage.
+- Portfolio totals aggregate only non-Stopped initiatives; measured figures replace
+  claims wherever actuals exist.
+- "Reset demo data" in the footer restores the seeded demo portfolio.

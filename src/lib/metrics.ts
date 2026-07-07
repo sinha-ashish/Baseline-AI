@@ -1,28 +1,39 @@
-import type { Confidence, Department, Status, UseCase } from "./types";
+import type { Confidence, Department, Initiative, Status } from "./types";
 
-export function hoursSavedPerMonth(uc: UseCase): number {
-  return uc.totalUsers * uc.timeSavedPerUserPerMonth;
+/** Claimed hours: the throughput assertion (users × time saved). */
+export function hoursSavedPerMonth(initiative: Initiative): number {
+  return initiative.totalUsers * initiative.timeSavedPerUserPerMonth;
 }
 
-export function annualCost(uc: UseCase): number {
-  return uc.expectedMonthlyCost * 12;
+/** Measured hours where actuals exist, otherwise the claim. */
+export function effectiveHoursSaved(initiative: Initiative): number {
+  return initiative.actuals?.hoursSavedPerMonth ?? hoursSavedPerMonth(initiative);
+}
+
+/** Measured cost where actuals exist, otherwise the expected cost. */
+export function effectiveMonthlyCost(initiative: Initiative): number {
+  return initiative.actuals?.monthlyCost ?? initiative.expectedMonthlyCost;
+}
+
+export function annualCost(initiative: Initiative): number {
+  return effectiveMonthlyCost(initiative) * 12;
 }
 
 /** EUR per hour saved; null when no hours are saved (avoids division by zero). */
-export function costPerHourSaved(uc: UseCase): number | null {
-  const hours = hoursSavedPerMonth(uc);
+export function costPerHourSaved(initiative: Initiative): number | null {
+  const hours = effectiveHoursSaved(initiative);
   if (hours <= 0) return null;
-  return uc.expectedMonthlyCost / hours;
+  return effectiveMonthlyCost(initiative) / hours;
 }
 
 /** EUR per user per month; null when there are no users. */
-export function costPerUser(uc: UseCase): number | null {
-  if (uc.totalUsers <= 0) return null;
-  return uc.expectedMonthlyCost / uc.totalUsers;
+export function costPerUser(initiative: Initiative): number | null {
+  if (initiative.totalUsers <= 0) return null;
+  return effectiveMonthlyCost(initiative) / initiative.totalUsers;
 }
 
-export function isActive(uc: UseCase): boolean {
-  return uc.status !== "Stopped";
+export function isActive(initiative: Initiative): boolean {
+  return initiative.status !== "Stopped";
 }
 
 export interface PortfolioTotals {
@@ -36,14 +47,19 @@ export interface PortfolioTotals {
   activeCount: number;
 }
 
-export function portfolioTotals(useCases: UseCase[]): PortfolioTotals {
-  const active = useCases.filter(isActive);
-  const monthlyCost = active.reduce((s, uc) => s + uc.expectedMonthlyCost, 0);
-  const hoursSaved = active.reduce((s, uc) => s + hoursSavedPerMonth(uc), 0);
-  const impactedUsers = active.reduce((s, uc) => s + uc.totalUsers, 0);
+export function portfolioTotals(
+  initiatives: Initiative[],
+  opts?: { measuredOnly?: boolean }
+): PortfolioTotals {
+  const active = initiatives
+    .filter(isActive)
+    .filter((i) => !opts?.measuredOnly || i.confidence === "High");
+  const monthlyCost = active.reduce((s, i) => s + effectiveMonthlyCost(i), 0);
+  const hoursSaved = active.reduce((s, i) => s + effectiveHoursSaved(i), 0);
+  const impactedUsers = active.reduce((s, i) => s + i.totalUsers, 0);
   const highCost = active
-    .filter((uc) => uc.confidence === "High")
-    .reduce((s, uc) => s + uc.expectedMonthlyCost, 0);
+    .filter((i) => i.confidence === "High")
+    .reduce((s, i) => s + effectiveMonthlyCost(i), 0);
 
   return {
     monthlyCost,
@@ -56,7 +72,7 @@ export function portfolioTotals(useCases: UseCase[]): PortfolioTotals {
   };
 }
 
-export function statusCounts(useCases: UseCase[]): Record<Status, number> {
+export function statusCounts(initiatives: Initiative[]): Record<Status, number> {
   const counts: Record<Status, number> = {
     Idea: 0,
     POC: 0,
@@ -64,19 +80,19 @@ export function statusCounts(useCases: UseCase[]): Record<Status, number> {
     Production: 0,
     Stopped: 0,
   };
-  for (const uc of useCases) counts[uc.status] += 1;
+  for (const i of initiatives) counts[i.status] += 1;
   return counts;
 }
 
 export function confidenceCostMix(
-  useCases: UseCase[]
+  initiatives: Initiative[]
 ): { confidence: Confidence; cost: number; count: number }[] {
-  const active = useCases.filter(isActive);
+  const active = initiatives.filter(isActive);
   return (["High", "Medium", "Low"] as const).map((confidence) => {
-    const entries = active.filter((uc) => uc.confidence === confidence);
+    const entries = active.filter((i) => i.confidence === confidence);
     return {
       confidence,
-      cost: entries.reduce((s, uc) => s + uc.expectedMonthlyCost, 0),
+      cost: entries.reduce((s, i) => s + effectiveMonthlyCost(i), 0),
       count: entries.length,
     };
   });
@@ -91,13 +107,13 @@ export interface DepartmentSpend {
 
 export function departmentSpend(
   departments: Department[],
-  useCases: UseCase[]
+  initiatives: Initiative[]
 ): DepartmentSpend[] {
-  const active = useCases.filter(isActive);
+  const active = initiatives.filter(isActive);
   return departments.map((department) => {
     const spend = active
-      .filter((uc) => uc.department === department.name)
-      .reduce((s, uc) => s + uc.expectedMonthlyCost, 0);
+      .filter((i) => i.department === department.name)
+      .reduce((s, i) => s + effectiveMonthlyCost(i), 0);
     const utilization =
       department.monthlyBudget > 0 ? spend / department.monthlyBudget : null;
     return {
@@ -109,10 +125,19 @@ export function departmentSpend(
   });
 }
 
-export function topByCost(useCases: UseCase[], n: number): UseCase[] {
-  return useCases
+export function topByCost(initiatives: Initiative[], n: number): Initiative[] {
+  return initiatives
     .filter(isActive)
     .slice()
-    .sort((a, b) => b.expectedMonthlyCost - a.expectedMonthlyCost)
+    .sort((a, b) => effectiveMonthlyCost(b) - effectiveMonthlyCost(a))
     .slice(0, n);
+}
+
+/** Delta of measured cost against the original claim, as a fraction (−0.23 = 23% under). */
+export function actualsCostDelta(initiative: Initiative): number | null {
+  if (!initiative.actuals || initiative.expectedMonthlyCost <= 0) return null;
+  return (
+    (initiative.actuals.monthlyCost - initiative.expectedMonthlyCost) /
+    initiative.expectedMonthlyCost
+  );
 }
