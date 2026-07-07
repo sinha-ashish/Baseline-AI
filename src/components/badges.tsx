@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import type { Confidence, Status } from "@/lib/types";
+import { VERDICT_META, type Verdict } from "@/lib/verdict";
 
 /**
  * Confidence is the product's core visual system: measured facts are solid
@@ -48,6 +49,21 @@ export function StatusBadge({ status }: { status: Status }) {
   return (
     <Badge variant="outline" className={statusStyles[status]}>
       {status}
+    </Badge>
+  );
+}
+
+const verdictStyles: Record<Verdict, string> = {
+  "quick-win": "border-emerald-500/30 bg-emerald-500/10 text-emerald-400",
+  "strategic-bet": "border-zinc-400/50 bg-zinc-400/10 text-zinc-100",
+  filler: "border-zinc-600 bg-zinc-800/40 text-zinc-400",
+  trap: "border-amber-500/30 bg-amber-500/10 text-amber-400",
+};
+
+export function VerdictBadge({ verdict }: { verdict: Verdict }) {
+  return (
+    <Badge variant="outline" className={verdictStyles[verdict]} title={VERDICT_META[verdict].line}>
+      {VERDICT_META[verdict].label}
     </Badge>
   );
 }

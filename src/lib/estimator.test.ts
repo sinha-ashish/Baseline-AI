@@ -5,9 +5,17 @@ import {
   monthlyCostUsd,
   type EstimateInputs,
 } from "./estimator";
-import { usdToEur, type ModelPrice } from "./pricing";
-import { costPerHourSaved, costPerUser, portfolioTotals } from "./metrics";
-import type { UseCase } from "./types";
+import { blendPrices, usdToEur, type ModelPrice } from "./pricing";
+import {
+  actualsCostDelta,
+  costPerHourSaved,
+  costPerUser,
+  effectiveHoursSaved,
+  effectiveMonthlyCost,
+  portfolioTotals,
+} from "./metrics";
+import { burdenScore, quadrantPosition, verdictFor } from "./verdict";
+import type { Initiative } from "./types";
 
 const testPrice: ModelPrice = {
   id: "test-model",
@@ -81,34 +89,118 @@ describe("computeEstimate", () => {
   });
 });
 
-describe("metrics guards", () => {
-  const base: UseCase = {
-    id: "t1",
-    name: "Test",
-    department: "IT",
-    owner: "Test Owner",
-    status: "Pilot",
-    category: "Gen",
-    usagePattern: "user-driven",
-    totalUsers: 0,
-    timeSavedPerUserPerMonth: 0,
-    expectedMonthlyCost: 100,
-    peakUsage: "",
-    fallback: "",
-    confidence: "Low",
-  };
+describe("blendPrices — the gateway assumption", () => {
+  const cheap = { inputPerMTok: 1, outputPerMTok: 5 };
+  const premium = { inputPerMTok: 5, outputPerMTok: 25 };
 
+  it("blends by premium share", () => {
+    // 80/20: in = 1×0.8 + 5×0.2 = 1.8; out = 5×0.8 + 25×0.2 = 9
+    const blended = blendPrices(cheap, premium, 0.2);
+    expect(blended.inputPerMTok).toBeCloseTo(1.8, 10);
+    expect(blended.outputPerMTok).toBeCloseTo(9, 10);
+  });
+
+  it("degenerates to the single model at the extremes", () => {
+    expect(blendPrices(cheap, premium, 0)).toEqual(cheap);
+    expect(blendPrices(cheap, premium, 1)).toEqual(premium);
+  });
+
+  it("clamps out-of-range shares", () => {
+    expect(blendPrices(cheap, premium, 1.5)).toEqual(premium);
+    expect(blendPrices(cheap, premium, -1)).toEqual(cheap);
+  });
+});
+
+describe("verdict — value against cost and effort", () => {
+  it("scores burden from cost bands and effort sizes", () => {
+    expect(burdenScore(500, "S")).toBe(0); // <€1k + S
+    expect(burdenScore(1500, "M")).toBe(2); // €1–3k + M
+    expect(burdenScore(3500, "L")).toBe(4); // >€3k + L
+  });
+
+  it("places the four verdicts", () => {
+    expect(verdictFor(5, 500, "S")).toBe("quick-win"); // high value, low burden
+    expect(verdictFor(4, 3500, "L")).toBe("strategic-bet"); // high value, high burden
+    expect(verdictFor(2, 500, "S")).toBe("filler"); // low value, low burden
+    expect(verdictFor(2, 1500, "L")).toBe("trap"); // low value, high burden
+  });
+
+  it("treats value 3 as low and 4 as high (the documented threshold)", () => {
+    expect(verdictFor(3, 500, "S")).toBe("filler");
+    expect(verdictFor(4, 500, "S")).toBe("quick-win");
+  });
+
+  it("normalizes quadrant positions into 0..1", () => {
+    expect(quadrantPosition(1, 0, "S")).toEqual({ x: 0, y: 0 });
+    expect(quadrantPosition(5, 5000, "L")).toEqual({ x: 1, y: 1 });
+  });
+});
+
+const base: Initiative = {
+  id: "t1",
+  name: "Test",
+  department: "IT",
+  owner: "Test Owner",
+  status: "Pilot",
+  category: "Gen",
+  usagePattern: "user-driven",
+  totalUsers: 0,
+  timeSavedPerUserPerMonth: 0,
+  expectedMonthlyCost: 100,
+  peakUsage: "",
+  fallback: "",
+  confidence: "Low",
+  perceivedValue: 3,
+  buildEffort: "M",
+};
+
+describe("metrics guards", () => {
   it("returns null instead of dividing by zero", () => {
     expect(costPerHourSaved(base)).toBeNull();
     expect(costPerUser(base)).toBeNull();
   });
 
   it("filters to High confidence with measuredOnly", () => {
-    const cases: UseCase[] = [
+    const initiatives: Initiative[] = [
       { ...base, id: "a", expectedMonthlyCost: 100, confidence: "Low" },
       { ...base, id: "b", expectedMonthlyCost: 200, confidence: "High" },
     ];
-    expect(portfolioTotals(cases).monthlyCost).toBe(300);
-    expect(portfolioTotals(cases, { measuredOnly: true }).monthlyCost).toBe(200);
+    expect(portfolioTotals(initiatives).monthlyCost).toBe(300);
+    expect(portfolioTotals(initiatives, { measuredOnly: true }).monthlyCost).toBe(200);
+  });
+});
+
+describe("actuals — measured beats claimed", () => {
+  const measured: Initiative = {
+    ...base,
+    id: "m1",
+    totalUsers: 30,
+    timeSavedPerUserPerMonth: 6, // claim: 180 h
+    expectedMonthlyCost: 2400,
+    confidence: "High",
+    actuals: {
+      monthlyCost: 1850,
+      hoursSavedPerMonth: 205,
+      quality: "measured",
+      recordedAt: "2026-06-01T00:00:00.000Z",
+    },
+  };
+
+  it("uses actuals for effective cost and hours", () => {
+    expect(effectiveMonthlyCost(measured)).toBe(1850);
+    expect(effectiveHoursSaved(measured)).toBe(205);
+    expect(effectiveMonthlyCost(base)).toBe(100);
+  });
+
+  it("computes the estimate-vs-actual delta", () => {
+    // 2400 → 1850 is 22.9% under
+    expect(actualsCostDelta(measured)).toBeCloseTo(-0.229, 3);
+    expect(actualsCostDelta(base)).toBeNull();
+  });
+
+  it("feeds actuals into portfolio totals", () => {
+    const totals = portfolioTotals([measured]);
+    expect(totals.monthlyCost).toBe(1850);
+    expect(totals.hoursSaved).toBe(205);
   });
 });

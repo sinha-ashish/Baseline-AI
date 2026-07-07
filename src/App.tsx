@@ -83,7 +83,7 @@ export default function App() {
           <DialogHeader>
             <DialogTitle>Reset demo data?</DialogTitle>
             <DialogDescription>
-              All your changes will be discarded and the original demo use cases restored.
+              All your changes will be discarded and the original demo initiatives restored.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

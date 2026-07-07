@@ -1,7 +1,14 @@
 import type { ReactNode } from "react";
 import { useLedgerStore } from "@/store";
-import { isActive, portfolioTotals, topByCost } from "@/lib/metrics";
+import {
+  effectiveMonthlyCost,
+  isActive,
+  portfolioTotals,
+  topByCost,
+} from "@/lib/metrics";
+import { quadrantPosition, verdictFor, VERDICT_META } from "@/lib/verdict";
 import { CountUp } from "@/components/CountUp";
+import { QuadrantPlot } from "@/components/QuadrantPlot";
 import { formatEur, formatNumber } from "@/lib/utils";
 
 /** A statement-style line: label, dot leader, right-aligned figure. */
@@ -30,11 +37,22 @@ function SectionMark({ children }: { children: ReactNode }) {
 }
 
 export function Landing() {
-  const useCases = useLedgerStore((s) => s.useCases);
-  const totals = portfolioTotals(useCases);
-  const measured = portfolioTotals(useCases, { measuredOnly: true });
-  const trackGlimpse = topByCost(useCases, 3);
-  const measuredCount = useCases.filter(isActive).filter((uc) => uc.confidence === "High").length;
+  const initiatives = useLedgerStore((s) => s.initiatives);
+  const totals = portfolioTotals(initiatives);
+  const measured = portfolioTotals(initiatives, { measuredOnly: true });
+  const trackGlimpse = topByCost(initiatives, 3);
+  const active = initiatives.filter(isActive);
+  const measuredCount = active.filter((i) => i.confidence === "High").length;
+
+  // The estimate-stage glimpse: a real initiative from the live portfolio,
+  // plotted on the verdict quadrant.
+  const glimpse =
+    active.find(
+      (i) => verdictFor(i.perceivedValue, effectiveMonthlyCost(i), i.buildEffort) === "quick-win"
+    ) ?? active[0];
+  const glimpseVerdict = glimpse
+    ? verdictFor(glimpse.perceivedValue, effectiveMonthlyCost(glimpse), glimpse.buildEffort)
+    : null;
 
   return (
     <div className="mx-auto max-w-6xl px-6">
@@ -50,15 +68,18 @@ export function Landing() {
         </h1>
         <p className="mt-7 max-w-2xl text-base leading-relaxed text-muted-foreground">
           Enterprises greenlight AI on optimistic estimates. When finance asks what it is actually
-          worth, most teams have a guess and a shrug. Baseline gives every use case a cost, a
-          savings claim, and a confidence label — then moves it from guessed to measured.
+          worth, most teams have a guess and a shrug — and half of what got built saves hours
+          nobody actually feels. Baseline puts a confidence label on every cost and moves it from
+          guessed to measured. And because value is not just hours saved — the feature that makes
+          a product feel smart can matter more than the one that automates a hundred invisible
+          hours — it scores both, and tells you what is a quick win and what is a trap.
         </p>
         <div className="mt-9 flex flex-wrap gap-3">
           <a
             href="#/estimate"
             className="inline-flex h-10 items-center rounded-md bg-primary px-5 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90"
           >
-            Estimate a use case
+            Estimate an initiative
           </a>
           <a
             href="#/dashboard"
@@ -76,41 +97,52 @@ export function Landing() {
           <div>
             <div className="font-display text-2xl">01 · Estimate</div>
             <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-              Price a use case before it is built — in two minutes, as a band, not a point.
+              Price an initiative before it is built — a cost band, and a build-or-skip verdict
+              from value against cost and effort.
             </p>
             <div className="mt-5 rounded-lg border bg-card p-4 text-sm">
-              <div className="mb-3 text-xs text-muted-foreground">
-                The estimator's output — example figures
+              <div className="mb-2 text-xs text-muted-foreground">
+                The estimator's verdict — from the live demo portfolio
               </div>
-              <div className="space-y-2">
-                <StatementRow label="Expected" value={<span>≈ €980 /mo</span>} />
-                <StatementRow
-                  label="Busy month"
-                  value={<span className="text-amber-400">≈ €1,470 /mo</span>}
-                />
-                <StatementRow
-                  label="Bad day"
-                  value={<span className="text-amber-400">≈ €2,940 /mo</span>}
-                />
-              </div>
+              {glimpse && glimpseVerdict && (
+                <>
+                  <QuadrantPlot
+                    points={[
+                      {
+                        id: glimpse.id,
+                        name: glimpse.name,
+                        ...quadrantPosition(
+                          glimpse.perceivedValue,
+                          effectiveMonthlyCost(glimpse),
+                          glimpse.buildEffort
+                        ),
+                        verdict: glimpseVerdict,
+                      },
+                    ]}
+                    highlightId={glimpse.id}
+                  />
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {glimpse.name}: {VERDICT_META[glimpseVerdict].label} —{" "}
+                    {VERDICT_META[glimpseVerdict].line}
+                  </p>
+                </>
+              )}
             </div>
           </div>
           <div>
             <div className="font-display text-2xl">02 · Track</div>
             <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-              Every use case is a ledger line: cost, hours saved, owner, budget. Stopped items drop
-              out of the totals.
+              Every initiative is a ledger line: cost, hours saved, owner, budget. Stopped items
+              drop out of the totals.
             </p>
             <div className="mt-5 rounded-lg border bg-card p-4 text-sm">
-              <div className="mb-3 text-xs text-muted-foreground">
-                From the live demo portfolio
-              </div>
+              <div className="mb-3 text-xs text-muted-foreground">From the live demo portfolio</div>
               <div className="space-y-2">
-                {trackGlimpse.map((uc) => (
+                {trackGlimpse.map((i) => (
                   <StatementRow
-                    key={uc.id}
-                    label={uc.name}
-                    value={`${formatEur(uc.expectedMonthlyCost)} /mo`}
+                    key={i.id}
+                    label={i.name}
+                    value={`${formatEur(effectiveMonthlyCost(i))} /mo`}
                     className="min-w-0 [&>span:first-child]:truncate"
                   />
                 ))}
@@ -136,7 +168,7 @@ export function Landing() {
                 />
                 <StatementRow
                   label="Entries backed by bills or logs"
-                  value={`${measuredCount} of ${useCases.filter(isActive).length}`}
+                  value={`${measuredCount} of ${active.length}`}
                 />
               </div>
             </div>
@@ -181,7 +213,7 @@ export function Landing() {
         <SectionMark>Roadmap</SectionMark>
         <div className="mt-8 max-w-2xl space-y-4 text-sm sm:text-base">
           <StatementRow
-            label="Simulate — price a use case before it exists"
+            label="Simulate — price an initiative before it exists"
             value={<span className="text-emerald-400">live</span>}
           />
           <StatementRow

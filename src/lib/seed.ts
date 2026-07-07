@@ -1,4 +1,4 @@
-import type { Department, UseCase } from "./types";
+import type { Department, Initiative } from "./types";
 
 export const seedDepartments: Department[] = [
   { name: "HR", monthlyBudget: 2000 },
@@ -7,9 +7,17 @@ export const seedDepartments: Department[] = [
   { name: "IT", monthlyBudget: 5000 },
 ];
 
-export const seedUseCases: UseCase[] = [
+/**
+ * Generic-plausible enterprise initiatives — never named-company flavored.
+ * Perceived value and build effort are seeded judgments; the two High-
+ * confidence entries carry actuals so the reconcile view has something real
+ * to show. Verdict spread: two quick wins, three strategic bets, three
+ * fillers, one trap (Supplier email triage — the expensive thing nobody
+ * feels), one stopped.
+ */
+export const seedInitiatives: Initiative[] = [
   {
-    id: "uc-contract-clauses",
+    id: "init-contract-clauses",
     name: "Contract clause extraction",
     department: "Finance",
     owner: "Lena Hoffmann",
@@ -22,9 +30,11 @@ export const seedUseCases: UseCase[] = [
     peakUsage: "Quarter-end contract renewals",
     fallback: "Manual legal review",
     confidence: "Medium",
+    perceivedValue: 4,
+    buildEffort: "L",
   },
   {
-    id: "uc-monthly-close",
+    id: "init-monthly-close",
     name: "Monthly close Excel validation",
     department: "Finance",
     owner: "Jonas Weber",
@@ -37,9 +47,17 @@ export const seedUseCases: UseCase[] = [
     peakUsage: "First 5 business days of the month",
     fallback: "Manual tie-out checklist",
     confidence: "High",
+    perceivedValue: 4,
+    buildEffort: "M",
+    actuals: {
+      monthlyCost: 1310,
+      hoursSavedPerMonth: 205,
+      quality: "measured",
+      recordedAt: "2026-06-05T00:00:00.000Z",
+    },
   },
   {
-    id: "uc-invoice-coding",
+    id: "init-invoice-coding",
     name: "Invoice coding suggestions",
     department: "Finance",
     owner: "Sofia Ricci",
@@ -52,9 +70,11 @@ export const seedUseCases: UseCase[] = [
     peakUsage: "Month-end AP run",
     fallback: "Rule-based coding engine",
     confidence: "Low",
+    perceivedValue: 2,
+    buildEffort: "S",
   },
   {
-    id: "uc-hr-chatbot",
+    id: "init-hr-chatbot",
     name: "HR policy chatbot",
     department: "HR",
     owner: "Priya Nair",
@@ -67,9 +87,11 @@ export const seedUseCases: UseCase[] = [
     peakUsage: "Open enrollment & policy updates",
     fallback: "HR shared inbox",
     confidence: "Medium",
+    perceivedValue: 4,
+    buildEffort: "S",
   },
   {
-    id: "uc-onboarding-docs",
+    id: "init-onboarding-docs",
     name: "Onboarding doc generator",
     department: "HR",
     owner: "Marta Kowalska",
@@ -82,9 +104,11 @@ export const seedUseCases: UseCase[] = [
     peakUsage: "Quarterly hiring waves",
     fallback: "Template library",
     confidence: "Low",
+    perceivedValue: 3,
+    buildEffort: "M",
   },
   {
-    id: "uc-shift-handover",
+    id: "init-shift-handover",
     name: "Shift handover summaries",
     department: "Operations",
     owner: "Tomás Silva",
@@ -97,9 +121,11 @@ export const seedUseCases: UseCase[] = [
     peakUsage: "Shift changes at 06:00 / 14:00 / 22:00",
     fallback: "Handwritten shift log",
     confidence: "Low",
+    perceivedValue: 3,
+    buildEffort: "S",
   },
   {
-    id: "uc-supplier-triage",
+    id: "init-supplier-triage",
     name: "Supplier email triage",
     department: "Operations",
     owner: "Anna Lindqvist",
@@ -112,9 +138,11 @@ export const seedUseCases: UseCase[] = [
     peakUsage: "Peak season (Q4)",
     fallback: "Shared mailbox rules",
     confidence: "Medium",
+    perceivedValue: 2,
+    buildEffort: "L",
   },
   {
-    id: "uc-incident-summaries",
+    id: "init-incident-summaries",
     name: "Incident summary drafting",
     department: "IT",
     owner: "Marc Dubois",
@@ -127,9 +155,11 @@ export const seedUseCases: UseCase[] = [
     peakUsage: "Major incident bridges",
     fallback: "On-call scribe",
     confidence: "Medium",
+    perceivedValue: 4,
+    buildEffort: "S",
   },
   {
-    id: "uc-helpdesk-bot",
+    id: "init-helpdesk-bot",
     name: "Helpdesk ticket deflection bot",
     department: "IT",
     owner: "Elena Petrova",
@@ -142,9 +172,17 @@ export const seedUseCases: UseCase[] = [
     peakUsage: "Monday mornings & patch days",
     fallback: "L1 helpdesk queue",
     confidence: "High",
+    perceivedValue: 4,
+    buildEffort: "L",
+    actuals: {
+      monthlyCost: 2120,
+      hoursSavedPerMonth: 430,
+      quality: "measured",
+      recordedAt: "2026-06-12T00:00:00.000Z",
+    },
   },
   {
-    id: "uc-code-review",
+    id: "init-code-review",
     name: "Code review assistant",
     department: "IT",
     owner: "David Chen",
@@ -157,5 +195,7 @@ export const seedUseCases: UseCase[] = [
     peakUsage: "Release freeze weeks",
     fallback: "Peer review",
     confidence: "Low",
+    perceivedValue: 2,
+    buildEffort: "M",
   },
 ];

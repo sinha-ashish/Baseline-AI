@@ -29,3 +29,28 @@ export const MODEL_PRICES: ModelPrice[] = [
 export function getModelPrice(id: string): ModelPrice | undefined {
   return MODEL_PRICES.find((m) => m.id === id);
 }
+
+/** Just the two per-MTok rates — what the estimator math actually needs. */
+export type PriceRates = Pick<ModelPrice, "inputPerMTok" | "outputPerMTok">;
+
+/**
+ * The "let the gateway decide" blend: a routing layer that sends most
+ * requests to a cheaper model and escalates the rest. This is an assumption
+ * about architecture, not something the tool does — the UI labels it as such
+ * and shows the split.
+ */
+export const DEFAULT_PREMIUM_SHARE = 0.2;
+export const DEFAULT_CHEAP_MODEL_ID = "claude-haiku-4-5";
+export const DEFAULT_PREMIUM_MODEL_ID = "claude-sonnet-4-5";
+
+export function blendPrices(
+  cheap: PriceRates,
+  premium: PriceRates,
+  premiumShare: number
+): PriceRates {
+  const p = Math.min(1, Math.max(0, premiumShare));
+  return {
+    inputPerMTok: cheap.inputPerMTok * (1 - p) + premium.inputPerMTok * p,
+    outputPerMTok: cheap.outputPerMTok * (1 - p) + premium.outputPerMTok * p,
+  };
+}

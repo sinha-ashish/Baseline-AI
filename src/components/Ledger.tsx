@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown, Download, Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  ClipboardCheck,
+  Download,
+  Pencil,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -24,12 +33,19 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ConfidenceBadge, StatusBadge } from "@/components/badges";
-import { UseCaseFormSheet } from "@/components/UseCaseForm";
+import { ConfidenceBadge, StatusBadge, VerdictBadge } from "@/components/badges";
+import { InitiativeFormSheet } from "@/components/InitiativeForm";
+import { RecordActualsDialog } from "@/components/RecordActualsDialog";
 import { useLedgerStore } from "@/store";
-import { CONFIDENCES, STATUSES, type UseCase } from "@/lib/types";
-import { costPerHourSaved, hoursSavedPerMonth } from "@/lib/metrics";
-import { downloadCsv, useCasesToCsv } from "@/lib/csv";
+import { CONFIDENCES, STATUSES, type Initiative } from "@/lib/types";
+import {
+  actualsCostDelta,
+  costPerHourSaved,
+  effectiveHoursSaved,
+  effectiveMonthlyCost,
+} from "@/lib/metrics";
+import { verdictFor } from "@/lib/verdict";
+import { downloadCsv, initiativesToCsv } from "@/lib/csv";
 import { cn, formatEur, formatEurPrecise, formatNumber } from "@/lib/utils";
 
 const ALL = "all";
@@ -38,9 +54,9 @@ type SortKey = "cost" | "costPerHour" | null;
 type SortDir = "asc" | "desc";
 
 export function Ledger() {
-  const useCases = useLedgerStore((s) => s.useCases);
+  const initiatives = useLedgerStore((s) => s.initiatives);
   const departments = useLedgerStore((s) => s.departments);
-  const deleteUseCase = useLedgerStore((s) => s.deleteUseCase);
+  const deleteInitiative = useLedgerStore((s) => s.deleteInitiative);
   const highlightId = useLedgerStore((s) => s.highlightId);
   const setHighlight = useLedgerStore((s) => s.setHighlight);
 
@@ -58,21 +74,22 @@ export function Ledger() {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
   const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState<UseCase | null>(null);
-  const [pendingDelete, setPendingDelete] = useState<UseCase | null>(null);
+  const [editing, setEditing] = useState<Initiative | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Initiative | null>(null);
+  const [recordingActuals, setRecordingActuals] = useState<Initiative | null>(null);
 
   const filtered = useMemo(() => {
-    let rows = useCases.filter(
-      (uc) =>
-        (departmentFilter === ALL || uc.department === departmentFilter) &&
-        (statusFilter === ALL || uc.status === statusFilter) &&
-        (confidenceFilter === ALL || uc.confidence === confidenceFilter)
+    let rows = initiatives.filter(
+      (i) =>
+        (departmentFilter === ALL || i.department === departmentFilter) &&
+        (statusFilter === ALL || i.status === statusFilter) &&
+        (confidenceFilter === ALL || i.confidence === confidenceFilter)
     );
     if (sortKey) {
       const dir = sortDir === "asc" ? 1 : -1;
       rows = rows.slice().sort((a, b) => {
         if (sortKey === "cost") {
-          return (a.expectedMonthlyCost - b.expectedMonthlyCost) * dir;
+          return (effectiveMonthlyCost(a) - effectiveMonthlyCost(b)) * dir;
         }
         // Entries without a computable cost-per-hour sort to the bottom either way.
         const av = costPerHourSaved(a);
@@ -84,7 +101,7 @@ export function Ledger() {
       });
     }
     return rows;
-  }, [useCases, departmentFilter, statusFilter, confidenceFilter, sortKey, sortDir]);
+  }, [initiatives, departmentFilter, statusFilter, confidenceFilter, sortKey, sortDir]);
 
   function toggleSort(key: Exclude<SortKey, null>) {
     if (sortKey !== key) {
@@ -102,16 +119,16 @@ export function Ledger() {
     setFormOpen(true);
   }
 
-  function openEdit(uc: UseCase) {
-    setEditing(uc);
+  function openEdit(initiative: Initiative) {
+    setEditing(initiative);
     setFormOpen(true);
   }
 
   function exportCsv() {
-    downloadCsv("baseline-ai-ledger.csv", useCasesToCsv(filtered));
+    downloadCsv("baseline-ai-initiatives.csv", initiativesToCsv(filtered));
   }
 
-  const hasAny = useCases.length > 0;
+  const hasAny = initiatives.length > 0;
   const hasFilters =
     departmentFilter !== ALL || statusFilter !== ALL || confidenceFilter !== ALL;
 
@@ -142,7 +159,7 @@ export function Ledger() {
             <Download /> Export CSV
           </Button>
           <Button size="sm" onClick={openAdd}>
-            <Plus /> Add use case
+            <Plus /> Add initiative
           </Button>
         </div>
       </div>
@@ -152,22 +169,22 @@ export function Ledger() {
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <p className="text-base font-medium">
-              {hasAny && hasFilters ? "No use cases match these filters" : "The ledger is empty"}
+              {hasAny && hasFilters ? "No initiatives match these filters" : "The ledger is empty"}
             </p>
             <p className="mt-1 max-w-sm text-sm text-muted-foreground">
               {hasAny && hasFilters
-                ? "Try clearing a filter, or add a new use case."
-                : "Add your first AI use case to start tracking cost against time saved."}
+                ? "Try clearing a filter, or add a new initiative."
+                : "Add your first AI initiative to start tracking cost against time saved."}
             </p>
             <Button className="mt-4" size="sm" onClick={openAdd}>
-              <Plus /> Add use case
+              <Plus /> Add initiative
             </Button>
           </div>
         ) : (
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead className="pl-4">Use case</TableHead>
+                <TableHead className="pl-4">Initiative</TableHead>
                 <TableHead>Department</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Confidence</TableHead>
@@ -185,64 +202,87 @@ export function Ledger() {
                   dir={sortDir}
                   onClick={() => toggleSort("costPerHour")}
                 />
-                <TableHead className="w-20 pr-4 text-right">Actions</TableHead>
+                <TableHead className="w-28 pr-4 text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((uc) => {
-                const cph = costPerHourSaved(uc);
-                const stopped = uc.status === "Stopped";
+              {filtered.map((initiative) => {
+                const cph = costPerHourSaved(initiative);
+                const stopped = initiative.status === "Stopped";
+                const measured = !!initiative.actuals;
+                const unmeasured = initiative.confidence !== "High";
+                const verdict = verdictFor(
+                  initiative.perceivedValue,
+                  initiative.expectedMonthlyCost,
+                  initiative.buildEffort
+                );
+                const delta = actualsCostDelta(initiative);
                 return (
                   <TableRow
-                    key={uc.id}
+                    key={initiative.id}
                     ref={
-                      uc.id === highlightId
+                      initiative.id === highlightId
                         ? (el) => el?.scrollIntoView({ block: "center" })
                         : undefined
                     }
                     className={cn(
                       stopped && "opacity-55",
-                      uc.id === highlightId && "bg-emerald-500/10 transition-colors duration-1000"
+                      initiative.id === highlightId &&
+                        "bg-emerald-500/10 transition-colors duration-1000"
                     )}
                   >
                     <TableCell className="pl-4">
-                      <div className="font-medium">{uc.name}</div>
+                      <div className="flex items-center gap-2 font-medium">
+                        {initiative.name}
+                        {verdict === "trap" && !stopped && <VerdictBadge verdict="trap" />}
+                      </div>
                       <div className="mt-0.5 text-xs text-muted-foreground">
-                        {uc.owner} · {uc.category} · {uc.usagePattern}
+                        {initiative.owner} · {initiative.category} · {initiative.usagePattern} ·
+                        value {initiative.perceivedValue}/5 · effort {initiative.buildEffort}
                       </div>
                     </TableCell>
-                    <TableCell className="text-muted-foreground">{uc.department}</TableCell>
-                    <TableCell>
-                      <StatusBadge status={uc.status} />
+                    <TableCell className="text-muted-foreground">
+                      {initiative.department}
                     </TableCell>
                     <TableCell>
-                      <ConfidenceBadge confidence={uc.confidence} />
+                      <StatusBadge status={initiative.status} />
+                    </TableCell>
+                    <TableCell>
+                      <ConfidenceBadge confidence={initiative.confidence} />
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {formatNumber(uc.totalUsers)}
+                      {formatNumber(initiative.totalUsers)}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {formatNumber(hoursSavedPerMonth(uc))}
+                      {formatNumber(effectiveHoursSaved(initiative))}
                     </TableCell>
                     <TableCell
                       className={cn(
                         "text-right font-medium tabular-nums",
-                        uc.confidence === "Low" && "text-zinc-400"
+                        initiative.confidence === "Low" && "text-zinc-400"
                       )}
                     >
-                      {uc.confidence !== "High" && "≈ "}
-                      {formatEur(uc.expectedMonthlyCost)}
+                      {unmeasured && !measured && "≈ "}
+                      {formatEur(effectiveMonthlyCost(initiative))}
+                      {measured && delta !== null && (
+                        <div className="text-xs font-normal text-muted-foreground">
+                          est. ≈{formatEur(initiative.expectedMonthlyCost)} ·{" "}
+                          <span className={delta <= 0 ? "text-emerald-400" : "text-amber-400"}>
+                            {Math.abs(delta * 100).toFixed(0)}% {delta <= 0 ? "under" : "over"}
+                          </span>
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell
                       className={cn(
                         "text-right tabular-nums",
-                        uc.confidence === "Low" && "text-zinc-400"
+                        initiative.confidence === "Low" && "text-zinc-400"
                       )}
                     >
                       {cph === null ? (
                         <span className="text-muted-foreground">—</span>
                       ) : (
-                        `${uc.confidence !== "High" ? "≈ " : ""}${formatEurPrecise(cph)}`
+                        `${unmeasured ? "≈ " : ""}${formatEurPrecise(cph)}`
                       )}
                     </TableCell>
                     <TableCell className="pr-4">
@@ -250,9 +290,19 @@ export function Ledger() {
                         <Button
                           variant="ghost"
                           size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-emerald-400"
+                          onClick={() => setRecordingActuals(initiative)}
+                          aria-label={`Record actuals for ${initiative.name}`}
+                          title="Record actuals"
+                        >
+                          <ClipboardCheck />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                          onClick={() => openEdit(uc)}
-                          aria-label={`Edit ${uc.name}`}
+                          onClick={() => openEdit(initiative)}
+                          aria-label={`Edit ${initiative.name}`}
                         >
                           <Pencil />
                         </Button>
@@ -260,8 +310,8 @@ export function Ledger() {
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8 text-muted-foreground hover:text-red-400"
-                          onClick={() => setPendingDelete(uc)}
-                          aria-label={`Delete ${uc.name}`}
+                          onClick={() => setPendingDelete(initiative)}
+                          aria-label={`Delete ${initiative.name}`}
                         >
                           <Trash2 />
                         </Button>
@@ -276,17 +326,22 @@ export function Ledger() {
       </div>
 
       <p className="text-xs text-muted-foreground">
-        {filtered.length} of {useCases.length} use cases shown
-        {hasFilters ? " (filtered)" : ""} · Stopped use cases are excluded from portfolio totals.
+        {filtered.length} of {initiatives.length} initiatives shown
+        {hasFilters ? " (filtered)" : ""} · Stopped initiatives are excluded from portfolio
+        totals. Measured figures replace claims wherever actuals exist.
       </p>
 
-      <UseCaseFormSheet open={formOpen} onOpenChange={setFormOpen} editing={editing} />
+      <InitiativeFormSheet open={formOpen} onOpenChange={setFormOpen} editing={editing} />
+      <RecordActualsDialog
+        initiative={recordingActuals}
+        onClose={() => setRecordingActuals(null)}
+      />
 
       {/* Delete confirmation */}
       <Dialog open={pendingDelete !== null} onOpenChange={(open) => !open && setPendingDelete(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Delete use case?</DialogTitle>
+            <DialogTitle>Delete initiative?</DialogTitle>
             <DialogDescription>
               “{pendingDelete?.name}” will be removed from the ledger. This cannot be undone
               (except by resetting the demo data).
@@ -299,7 +354,7 @@ export function Ledger() {
             <Button
               variant="destructive"
               onClick={() => {
-                if (pendingDelete) deleteUseCase(pendingDelete.id);
+                if (pendingDelete) deleteInitiative(pendingDelete.id);
                 setPendingDelete(null);
               }}
             >

@@ -27,7 +27,9 @@ export function CountUp({
 
   useEffect(() => {
     const el = ref.current;
-    if (!el || prefersReducedMotion()) {
+    // A zero-height viewport (hidden iframe, prerender, headless capture)
+    // can never intersect — render the final value rather than a stuck 0.
+    if (!el || prefersReducedMotion() || window.innerHeight === 0) {
       setDisplay(value);
       return;
     }

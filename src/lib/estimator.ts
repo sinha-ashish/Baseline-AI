@@ -1,4 +1,4 @@
-import { usdToEur, type ModelPrice } from "./pricing";
+import { usdToEur, type PriceRates } from "./pricing";
 
 /**
  * Estimator math. Deterministic scenario bands — a straight expected
@@ -87,14 +87,14 @@ export function monthlyCostUsd(
   calls: number,
   tokensInPerCall: number,
   tokensOutPerCall: number,
-  price: ModelPrice
+  price: PriceRates
 ): number {
   const mTokIn = (calls * tokensInPerCall) / 1_000_000;
   const mTokOut = (calls * tokensOutPerCall) / 1_000_000;
   return mTokIn * price.inputPerMTok + mTokOut * price.outputPerMTok;
 }
 
-export function computeEstimate(inputs: EstimateInputs, price: ModelPrice): EstimateResult {
+export function computeEstimate(inputs: EstimateInputs, price: PriceRates): EstimateResult {
   const calls = callsPerMonth(inputs.volume);
   const expectedMonthlyUsd = monthlyCostUsd(
     calls,
